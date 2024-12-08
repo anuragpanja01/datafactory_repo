@@ -1,0 +1,140 @@
+{
+	"name": "pl_transform",
+	"properties": {
+		"activities": [
+			{
+				"name": "Perform Data Transformation",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Get Folder Details",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@activity('Get Folder Details').output.exists",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "TRANSFORMATION ERROR TRY AGAIN",
+							"description": "",
+							"type": "WebActivity",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"method": "POST",
+								"url": "panjala.anurag1@gmail.com",
+								"body": "Error occurred during transformation. CODE: 004. Pipeline: pl_transform. Point of Error: IF CLAUSE ACTIVITY: Perform Data Transformation"
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "Race Results Transformation",
+							"type": "DatabricksNotebook",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"notebookPath": "/Repos/panjala.anurag1@gmail.com/databricks_repo/Formula1_ETL_Analysis_Databricks/transformations/1.race_results_derived",
+								"baseParameters": {
+									"file_date": {
+										"value": "@formatDateTime(pipeline().parameters.p_window_end_date,'yyyy-MM-dd')",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "Driver and Cons Standings",
+							"type": "DatabricksNotebook",
+							"dependsOn": [
+								{
+									"activity": "Race Results Transformation",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"notebookPath": "/Repos/panjala.anurag1@gmail.com/databricks_repo/Formula1_ETL_Analysis_Databricks/transformations/2.standings",
+								"baseParameters": {
+									"file_date": {
+										"value": "@formatDateTime(pipeline().parameters.p_window_end_date,'yyyy-MM-dd')",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Get Folder Details",
+				"type": "GetMetadata",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"fieldList": [
+						"exists"
+					],
+					"storeSettings": {
+						"type": "AzureBlobFSReadSettings",
+						"recursive": true,
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "JsonReadSettings"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"p_window_end_date": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"v_data_source": {
+				"type": "String",
+				"defaultValue": "ERGAST"
+			}
+		},
+		"annotations": [],
+		"lastPublishTime": "2024-12-08T18:09:02Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}
