@@ -1,0 +1,13 @@
+{
+	"name": "ls_dbx_formula1_ingestion",
+	"properties": {
+		"annotations": [],
+		"type": "AzureDatabricks",
+		"typeProperties": {
+			"domain": "https://adb-2355385879613797.17.azuredatabricks.net",
+			"authentication": "MSI",
+			"workspaceResourceId": "/subscriptions/e24ab072-926a-446a-a22c-f4f341e3e452/resourceGroups/formula1analysis_rg/providers/Microsoft.Databricks/workspaces/dbx-formala1-dev",
+			"existingClusterId": "1018-231741-pahtycs3"
+		}
+	}
+}
