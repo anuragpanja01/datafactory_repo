@@ -65,6 +65,10 @@
 										"type": "Expression"
 									}
 								}
+							},
+							"linkedServiceName": {
+								"referenceName": "ls_dbx_formula1_ingestion",
+								"type": "LinkedServiceReference"
 							}
 						},
 						{
@@ -91,6 +95,10 @@
 										"type": "Expression"
 									}
 								}
+							},
+							"linkedServiceName": {
+								"referenceName": "ls_dbx_formula1_ingestion",
+								"type": "LinkedServiceReference"
 							}
 						},
 						{
@@ -117,6 +125,10 @@
 										"type": "Expression"
 									}
 								}
+							},
+							"linkedServiceName": {
+								"referenceName": "ls_dbx_formula1_ingestion",
+								"type": "LinkedServiceReference"
 							}
 						},
 						{
@@ -143,6 +155,10 @@
 										"type": "Expression"
 									}
 								}
+							},
+							"linkedServiceName": {
+								"referenceName": "ls_dbx_formula1_ingestion",
+								"type": "LinkedServiceReference"
 							}
 						},
 						{
@@ -169,6 +185,10 @@
 										"type": "Expression"
 									}
 								}
+							},
+							"linkedServiceName": {
+								"referenceName": "ls_dbx_formula1_ingestion",
+								"type": "LinkedServiceReference"
 							}
 						},
 						{
@@ -195,6 +215,10 @@
 										"type": "Expression"
 									}
 								}
+							},
+							"linkedServiceName": {
+								"referenceName": "ls_dbx_formula1_ingestion",
+								"type": "LinkedServiceReference"
 							}
 						},
 						{
@@ -221,6 +245,10 @@
 										"type": "Expression"
 									}
 								}
+							},
+							"linkedServiceName": {
+								"referenceName": "ls_dbx_formula1_ingestion",
+								"type": "LinkedServiceReference"
 							}
 						},
 						{
@@ -247,6 +275,10 @@
 										"type": "Expression"
 									}
 								}
+							},
+							"linkedServiceName": {
+								"referenceName": "ls_dbx_formula1_ingestion",
+								"type": "LinkedServiceReference"
 							}
 						}
 					]
