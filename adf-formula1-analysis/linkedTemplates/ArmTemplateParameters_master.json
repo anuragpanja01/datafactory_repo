@@ -1,0 +1,24 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"value": "adf-formula1-analysis"
+		},
+		"ls_formula1_dl_accountKey": {
+			"value": ""
+		},
+		"ls_dbx_formula1_ingestion_properties_typeProperties_existingClusterId": {
+			"value": "1018-231741-pahtycs3"
+		},
+		"ls_formula1_dl_properties_typeProperties_url": {
+			"value": "https://dlsformula1dev.dfs.core.windows.net/"
+		},
+		"containerUri": {
+			"value": ""
+		},
+		"containerSasToken": {
+			"value": ""
+		}
+	}
+}

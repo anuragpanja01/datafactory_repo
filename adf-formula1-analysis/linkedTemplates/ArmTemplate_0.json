@@ -1,0 +1,682 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "adf-formula1-analysis"
+		},
+		"ls_formula1_dl_accountKey": {
+			"type": "secureString",
+			"metadata": "Secure string for 'accountKey' of 'ls_formula1_dl'"
+		},
+		"ls_dbx_formula1_ingestion_properties_typeProperties_existingClusterId": {
+			"type": "string",
+			"defaultValue": "1018-231741-pahtycs3"
+		},
+		"ls_formula1_dl_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://dlsformula1dev.dfs.core.windows.net/"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/ls_dbx_formula1_ingestion')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureDatabricks",
+				"typeProperties": {
+					"domain": "https://adb-2355385879613797.17.azuredatabricks.net",
+					"authentication": "MSI",
+					"workspaceResourceId": "/subscriptions/e24ab072-926a-446a-a22c-f4f341e3e452/resourceGroups/formula1analysis_rg/providers/Microsoft.Databricks/workspaces/dbx-formala1-dev",
+					"existingClusterId": "[parameters('ls_dbx_formula1_ingestion_properties_typeProperties_existingClusterId')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ls_formula1_dl')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobFS",
+				"typeProperties": {
+					"url": "[parameters('ls_formula1_dl_properties_typeProperties_url')]",
+					"accountKey": {
+						"type": "SecureString",
+						"value": "[parameters('ls_formula1_dl_accountKey')]"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_f1_raw')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "ls_formula1_dl",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"p_window_end_date": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"folderPath": {
+							"value": "@formatDateTime(dataset().p_window_end_date,'yyyy-MM-dd')",
+							"type": "Expression"
+						},
+						"fileSystem": "fraw"
+					}
+				},
+				"schema": {}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/ls_formula1_dl')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_ingestdata')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Check and Perform Raw Data Ingestion",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "Get Folder Details",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@activity('Get Folder Details').output.exists",
+								"type": "Expression"
+							},
+							"ifFalseActivities": [
+								{
+									"name": "INGESTION ERROR TRY AGAIN",
+									"description": "",
+									"type": "WebActivity",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"method": "POST",
+										"headers": {},
+										"url": "panjala.anurag1@gmail.com",
+										"body": "Error occurred while ingesting one of the files raw data. CODE: 001. Pipeline: pl_ingestdata. Point of Error: IF CLAUSE ACTIVITY: Check and Perform Raw Data  Ingestion."
+									}
+								}
+							],
+							"ifTrueActivities": [
+								{
+									"name": "Ingest Circuits File",
+									"type": "DatabricksNotebook",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"notebookPath": "/Repos/panjala.anurag1@gmail.com/databricks_repo/Formula1_ETL_Analysis_Databricks/ingestion-drivers/1.circuits_ingestionDriver",
+										"baseParameters": {
+											"file_date": {
+												"value": "@formatDateTime(pipeline().parameters.p_window_end_date,'yyyy-MM-dd')",
+												"type": "Expression"
+											},
+											"source": {
+												"value": "@variables('v_data_source')",
+												"type": "Expression"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "ls_dbx_formula1_ingestion",
+										"type": "LinkedServiceReference"
+									}
+								},
+								{
+									"name": "Ingest Races File",
+									"type": "DatabricksNotebook",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"notebookPath": "/Repos/panjala.anurag1@gmail.com/databricks_repo/Formula1_ETL_Analysis_Databricks/ingestion-drivers/2.races_ingestionDriver",
+										"baseParameters": {
+											"file_date": {
+												"value": "@formatDateTime(pipeline().parameters.p_window_end_date,'yyyy-MM-dd')",
+												"type": "Expression"
+											},
+											"source": {
+												"value": "@variables('v_data_source')",
+												"type": "Expression"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "ls_dbx_formula1_ingestion",
+										"type": "LinkedServiceReference"
+									}
+								},
+								{
+									"name": "Ingest Constructors File",
+									"type": "DatabricksNotebook",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"notebookPath": "/Repos/panjala.anurag1@gmail.com/databricks_repo/Formula1_ETL_Analysis_Databricks/ingestion-drivers/3.constructors_ingestionDriver",
+										"baseParameters": {
+											"file_date": {
+												"value": "@formatDateTime(pipeline().parameters.p_window_end_date,'yyyy-MM-dd')",
+												"type": "Expression"
+											},
+											"source": {
+												"value": "@variables('v_data_source')",
+												"type": "Expression"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "ls_dbx_formula1_ingestion",
+										"type": "LinkedServiceReference"
+									}
+								},
+								{
+									"name": "Ingest Drivers File",
+									"type": "DatabricksNotebook",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"notebookPath": "/Repos/panjala.anurag1@gmail.com/databricks_repo/Formula1_ETL_Analysis_Databricks/ingestion-drivers/4.drivers_ingestionDriver",
+										"baseParameters": {
+											"file_date": {
+												"value": "@formatDateTime(pipeline().parameters.p_window_end_date,'yyyy-MM-dd')",
+												"type": "Expression"
+											},
+											"source": {
+												"value": "@variables('v_data_source')",
+												"type": "Expression"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "ls_dbx_formula1_ingestion",
+										"type": "LinkedServiceReference"
+									}
+								},
+								{
+									"name": "Ingest Results File",
+									"type": "DatabricksNotebook",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"notebookPath": "/Repos/panjala.anurag1@gmail.com/databricks_repo/Formula1_ETL_Analysis_Databricks/ingestion-drivers/5.results_ingestionDriver",
+										"baseParameters": {
+											"file_date": {
+												"value": "@formatDateTime(pipeline().parameters.p_window_end_date,'yyyy-MM-dd')",
+												"type": "Expression"
+											},
+											"source": {
+												"value": "@variables('v_data_source')",
+												"type": "Expression"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "ls_dbx_formula1_ingestion",
+										"type": "LinkedServiceReference"
+									}
+								},
+								{
+									"name": "Ingest Pitstops File",
+									"type": "DatabricksNotebook",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"notebookPath": "/Repos/panjala.anurag1@gmail.com/databricks_repo/Formula1_ETL_Analysis_Databricks/ingestion-drivers/6.pitstops_ingestionDriver",
+										"baseParameters": {
+											"file_date": {
+												"value": "@formatDateTime(pipeline().parameters.p_window_end_date,'yyyy-MM-dd')",
+												"type": "Expression"
+											},
+											"source": {
+												"value": "@variables('v_data_source')",
+												"type": "Expression"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "ls_dbx_formula1_ingestion",
+										"type": "LinkedServiceReference"
+									}
+								},
+								{
+									"name": "Ingest Laptimes File",
+									"type": "DatabricksNotebook",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"notebookPath": "/Repos/panjala.anurag1@gmail.com/databricks_repo/Formula1_ETL_Analysis_Databricks/ingestion-drivers/7.laptimes_ingestionDriver",
+										"baseParameters": {
+											"file_date": {
+												"value": "@formatDateTime(pipeline().parameters.p_window_end_date,'yyyy-MM-dd')",
+												"type": "Expression"
+											},
+											"source": {
+												"value": "@variables('v_data_source')",
+												"type": "Expression"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "ls_dbx_formula1_ingestion",
+										"type": "LinkedServiceReference"
+									}
+								},
+								{
+									"name": "Ingest Qualifying File",
+									"type": "DatabricksNotebook",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"notebookPath": "/Repos/panjala.anurag1@gmail.com/databricks_repo/Formula1_ETL_Analysis_Databricks/ingestion-drivers/8.qualifying_ingestionDriver",
+										"baseParameters": {
+											"file_date": {
+												"value": "@formatDateTime(pipeline().parameters.p_window_end_date,'yyyy-MM-dd')",
+												"type": "Expression"
+											},
+											"source": {
+												"value": "@variables('v_data_source')",
+												"type": "Expression"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "ls_dbx_formula1_ingestion",
+										"type": "LinkedServiceReference"
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "Get Folder Details",
+						"type": "GetMetadata",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "ds_f1_raw",
+								"type": "DatasetReference",
+								"parameters": {
+									"p_window_end_date": {
+										"value": "@pipeline().parameters.p_window_end_date",
+										"type": "Expression"
+									}
+								}
+							},
+							"fieldList": [
+								"exists"
+							],
+							"storeSettings": {
+								"type": "AzureBlobFSReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							},
+							"formatSettings": {
+								"type": "JsonReadSettings"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"p_window_end_date": {
+						"type": "string"
+					}
+				},
+				"variables": {
+					"v_data_source": {
+						"type": "String",
+						"defaultValue": "ERGAST"
+					}
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-12-08T18:09:02Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/ds_f1_raw')]",
+				"[concat(variables('factoryId'), '/linkedServices/ls_dbx_formula1_ingestion')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_transform')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Perform Data Transformation",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "Get Folder Details",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@activity('Get Folder Details').output.exists",
+								"type": "Expression"
+							},
+							"ifFalseActivities": [
+								{
+									"name": "TRANSFORMATION ERROR TRY AGAIN",
+									"description": "",
+									"type": "WebActivity",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"method": "POST",
+										"headers": {},
+										"url": "panjala.anurag1@gmail.com",
+										"body": "Error occurred during transformation. CODE: 004. Pipeline: pl_transform. Point of Error: IF CLAUSE ACTIVITY: Perform Data Transformation"
+									}
+								}
+							],
+							"ifTrueActivities": [
+								{
+									"name": "Race Results Transformation",
+									"type": "DatabricksNotebook",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"notebookPath": "/Repos/panjala.anurag1@gmail.com/databricks_repo/Formula1_ETL_Analysis_Databricks/transformations/1.race_results_derived",
+										"baseParameters": {
+											"file_date": {
+												"value": "@formatDateTime(pipeline().parameters.p_window_end_date,'yyyy-MM-dd')",
+												"type": "Expression"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "ls_dbx_formula1_ingestion",
+										"type": "LinkedServiceReference"
+									}
+								},
+								{
+									"name": "Driver and Cons Standings",
+									"type": "DatabricksNotebook",
+									"dependsOn": [
+										{
+											"activity": "Race Results Transformation",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"notebookPath": "/Repos/panjala.anurag1@gmail.com/databricks_repo/Formula1_ETL_Analysis_Databricks/transformations/2.standings",
+										"baseParameters": {
+											"file_date": {
+												"value": "@formatDateTime(pipeline().parameters.p_window_end_date,'yyyy-MM-dd')",
+												"type": "Expression"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "ls_dbx_formula1_ingestion",
+										"type": "LinkedServiceReference"
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "Get Folder Details",
+						"type": "GetMetadata",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "ds_f1_raw",
+								"type": "DatasetReference",
+								"parameters": {
+									"p_window_end_date": {
+										"value": "@pipeline().parameters.p_window_end_date",
+										"type": "Expression"
+									}
+								}
+							},
+							"fieldList": [
+								"exists"
+							],
+							"storeSettings": {
+								"type": "AzureBlobFSReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							},
+							"formatSettings": {
+								"type": "JsonReadSettings"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"p_window_end_date": {
+						"type": "string"
+					}
+				},
+				"variables": {
+					"v_data_source": {
+						"type": "String",
+						"defaultValue": "ERGAST"
+					}
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-12-08T18:09:02Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/ds_f1_raw')]",
+				"[concat(variables('factoryId'), '/linkedServices/ls_dbx_formula1_ingestion')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_formula1_driver')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Ingest Formula 1 Data",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_ingestdata",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"p_window_end_date": {
+									"value": "@pipeline().parameters.p_window_end_date",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Tranform Formula1 Data",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Ingest Formula 1 Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_transform",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"p_window_end_date": {
+									"value": "@pipeline().parameters.p_window_end_date",
+									"type": "Expression"
+								}
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"p_window_end_date": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-12-08T18:09:02Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/pl_ingestdata')]",
+				"[concat(variables('factoryId'), '/pipelines/pl_transform')]"
+			]
+		}
+	]
+}
